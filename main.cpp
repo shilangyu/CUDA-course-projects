@@ -1,4 +1,5 @@
 
+#include "data.hpp"
 #include <array>
 #include <bitset>
 #include <cinttypes>
@@ -6,7 +7,6 @@
 #include <random>
 #include <utility>
 #include <vector>
-#include "data.hpp"
 
 auto h_count_set_bits(std::bitset<Data::n_bits> bitset) -> size_t {
   size_t count = 0;
