@@ -1,5 +1,4 @@
-
-#include "data.hpp"
+#include "data.cuh"
 #include <array>
 #include <bitset>
 #include <cinttypes>

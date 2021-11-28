@@ -1,2 +1,2 @@
-main: main.cpp data.cu data.hpp
-	clang++ -o $@ main.cpp data.cu -std=c++14
+main: main.cu data.cu data.cuh
+	nvcc -o $@ main.cu data.cu -std=c++14

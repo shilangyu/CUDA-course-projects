@@ -1,4 +1,4 @@
-#include "data.hpp"
+#include "data.cuh"
 #include <cstdint>
 #include <iostream>
 #include <limits>
