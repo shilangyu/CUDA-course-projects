@@ -3,22 +3,22 @@
 #include <iostream>
 #include <limits>
 #include <random>
+#include <utility>
 
 Data::Data() {
   _data = std::vector<std::vector<std::uint32_t>>(n_vectors);
+  // fixed seed
+  std::mt19937 gen(0);
   // uniform number generator for 32bit numbers
-  auto gen = std::bind(
-      std::uniform_int_distribution<std::uint32_t>{
-          std::numeric_limits<std::uint32_t>::min(),
-          std::numeric_limits<std::uint32_t>::max()},
-      // fixed seed
-      std::mt19937{0});
+  std::uniform_int_distribution<std::uint32_t> dist(
+      std::numeric_limits<std::uint32_t>::min(),
+      std::numeric_limits<std::uint32_t>::max());
 
   for (auto i = 0; i < n_vectors; i++) {
     std::vector<std::uint32_t> bits(n_32bits);
 
     for (auto j = 0; j < n_32bits; j++) {
-      bits[j] = gen();
+      bits[j] = dist(gen);
     }
 
     _data[i] = bits;
