@@ -40,4 +40,23 @@ auto Data::to_host_data() const -> std::vector<std::bitset<n_bits>> {
   return result;
 }
 
-auto Data::to_device_data() const -> std::uint32_t** {}
+auto Data::to_device_data() const -> std::uint32_t ** {
+  std::uint32_t **data;
+
+  cudaMallocManaged(&data, n_vectors * sizeof(std::uint32_t *));
+  for (auto i = 0; i < n_vectors; i++) {
+    cudaMallocManaged(&data[i], n_32bits * sizeof(std::uint32_t));
+    for (auto j = 0; j < n_32bits; j++) {
+      data[i][j] = _data[i][j];
+    }
+  }
+
+  return data;
+}
+
+auto Data::delete_device_data(std::uint32_t **data) -> void {
+  for (auto i = 0; i < n_vectors; i++) {
+    cudaFree(data[i]);
+  }
+  cudaFree(data);
+}
