@@ -23,6 +23,21 @@ Data::Data() {
 
     _data[i] = bits;
   }
+
+  // sprinkle some hamming one pairs
+  std::uniform_int_distribution<> vec_pos(0, n_vectors);
+  std::uniform_int_distribution<> bit_pos(0, n_bits);
+  for (auto i = 0; i < 11; i++) {
+    auto from = vec_pos(gen);
+    auto to   = vec_pos(gen);
+    auto bit  = bit_pos(gen);
+
+    _data[to] = _data[from];
+    // toggle a single bit
+    auto diff = (_data[from][bit / 32] ^ (1 << (bit % 32)));
+
+    _data[to][bit / 32] = diff;
+  }
 }
 
 auto Data::to_host_data() const -> std::vector<std::bitset<n_bits>> {

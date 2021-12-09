@@ -21,6 +21,8 @@ auto main() -> int {
   std::cout << "host: " << h_res.size() << ", device: "
             << "TODO" << std::endl;
 
+  cudaDeviceSynchronize();
+
   Data::delete_device_data(d_vectors);
   return 0;
 }
