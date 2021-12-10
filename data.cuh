@@ -13,6 +13,9 @@ struct DeviceData {
   /// array of pairs of indices of vectors with hamming distance of one
   /// first dimension are the pairs, second is a 2-element array
   int **output;
+
+  /// current index into output
+  int *o_idx;
 };
 
 class Data {

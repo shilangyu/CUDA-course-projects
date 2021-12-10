@@ -70,9 +70,15 @@ auto Data::to_device_data() const -> DeviceData {
   cudaMallocManaged(&output, n_vectors * sizeof(int *));
   for (auto i = 0; i < n_vectors; i++) {
     cudaMallocManaged(&output[i], 2 * sizeof(int));
+    output[i][0] = -1;
+    output[i][1] = -1;
   }
 
-  return {input, output};
+  int *o_idx;
+  cudaMallocManaged(&o_idx, sizeof(int));
+  *o_idx = 0;
+
+  return {input, output, o_idx};
 }
 
 auto Data::delete_device_data(DeviceData data) -> void {
@@ -84,4 +90,6 @@ auto Data::delete_device_data(DeviceData data) -> void {
     cudaFree(data.output[i]);
   }
   cudaFree(data.output);
+
+  cudaFree(data.o_idx);
 }
