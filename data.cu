@@ -8,7 +8,7 @@
 Data::Data() {
   _data = std::vector<std::vector<std::uint32_t>>(n_vectors);
   // fixed seed
-  std::mt19937 gen(0);
+  std::mt19937 gen(1);
   // uniform number generator for 32bit numbers
   std::uniform_int_distribution<std::uint32_t> dist(
       std::numeric_limits<std::uint32_t>::min(),
@@ -55,23 +55,33 @@ auto Data::to_host_data() const -> std::vector<std::bitset<n_bits>> {
   return result;
 }
 
-auto Data::to_device_data() const -> std::uint32_t ** {
-  std::uint32_t **data;
+auto Data::to_device_data() const -> DeviceData {
+  std::uint32_t **input;
 
-  cudaMallocManaged(&data, n_vectors * sizeof(std::uint32_t *));
+  cudaMallocManaged(&input, n_vectors * sizeof(std::uint32_t *));
   for (auto i = 0; i < n_vectors; i++) {
-    cudaMallocManaged(&data[i], n_32bits * sizeof(std::uint32_t));
+    cudaMallocManaged(&input[i], n_32bits * sizeof(std::uint32_t));
     for (auto j = 0; j < n_32bits; j++) {
-      data[i][j] = _data[i][j];
+      input[i][j] = _data[i][j];
     }
   }
 
-  return data;
+  std::size_t **output;
+  cudaMallocManaged(&output, n_vectors * sizeof(std::size_t *));
+  for (auto i = 0; i < n_vectors; i++) {
+    cudaMallocManaged(&output[i], 2 * sizeof(std::size_t));
+  }
+
+  return {input, output};
 }
 
-auto Data::delete_device_data(std::uint32_t **data) -> void {
+auto Data::delete_device_data(DeviceData data) -> void {
   for (auto i = 0; i < n_vectors; i++) {
-    cudaFree(data[i]);
+    cudaFree(data.input[i]);
   }
-  cudaFree(data);
+  cudaFree(data.input);
+  for (auto i = 0; i < n_vectors; i++) {
+    cudaFree(data.output[i]);
+  }
+  cudaFree(data.output);
 }

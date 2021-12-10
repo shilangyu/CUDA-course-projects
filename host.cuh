@@ -9,4 +9,4 @@ __host__ auto h_count_set_bits(std::bitset<Data::n_bits> bitset) -> size_t;
 
 /// returns pairs that have a hamming distance of 1 (executed on CPU)
 __host__ auto h_hamming_one(std::vector<std::bitset<Data::n_bits>> vectors)
-    -> std::vector<std::pair<std::string, std::string>>;
+    -> std::vector<std::pair<std::bitset<Data::n_bits>, std::bitset<Data::n_bits>>>;

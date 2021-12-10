@@ -5,6 +5,16 @@
 #include <cstdint>
 #include <vector>
 
+struct DeviceData {
+  /// array of inputs, first dimension represents a vector,
+  /// second are individual bits in bundles of 32
+  std::uint32_t **input;
+
+  /// array of pairs of indices of vectors with hamming distance of one
+  /// first dimension are the pairs, second is a 2-element array
+  std::size_t **output;
+};
+
 class Data {
 public:
   // could be templates, but would make the code 1000 times less readable
@@ -17,10 +27,10 @@ public:
 
   /// encodes individual ints into a bitset (big-endian)
   auto to_host_data() const -> std::vector<std::bitset<n_bits>>;
-  /// goodluck tracking bounds
-  auto to_device_data() const -> std::uint32_t **;
+  /// encodes data into device data, has to be cleaned up with [delete_device_data]
+  auto to_device_data() const -> DeviceData;
   /// cleanup the mess done with [to_device_data]
-  static auto delete_device_data(std::uint32_t **) -> void;
+  static auto delete_device_data(DeviceData) -> void;
 
 private:
   /// interpreted as concatination (big-endian):
