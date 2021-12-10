@@ -1,6 +1,6 @@
 #include "device.cuh"
 
-__global__ auto d_hamming_one(std::uint32_t **vectors) -> void {
+__global__ auto d_hamming_one(std::uint32_t **vectors, int **output) -> void {
   auto index = blockIdx.x * blockDim.x + threadIdx.x;
   int total  = 0;
 
@@ -15,6 +15,12 @@ __global__ auto d_hamming_one(std::uint32_t **vectors) -> void {
 #pragma unroll(Data::n_32bits)
     for (auto j = 0; j < Data::n_32bits; j++) {
       total += __popc(my_vector[j] ^ vectors[i][j]);
+    }
+
+    if (total == 1) {
+      int **old = atomicAdd(&output, sizeof(int));
+      old[0][0] = index;
+      old[0][1] = i;
     }
   }
 }
