@@ -66,7 +66,7 @@ auto Data::to_device_data() const -> DeviceData {
     }
   }
 
-  std::size_t **output;
+  int **output;
   cudaMallocManaged(&output, n_vectors * sizeof(int *));
   for (auto i = 0; i < n_vectors; i++) {
     cudaMallocManaged(&output[i], 2 * sizeof(int));

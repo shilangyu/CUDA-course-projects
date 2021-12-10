@@ -18,7 +18,7 @@ __global__ auto d_hamming_one(std::uint32_t **vectors, int **output) -> void {
     }
 
     if (total == 1) {
-      int **old = atomicAdd(&output, sizeof(int));
+      int **old = (int **)atomicAdd((int *)&output, sizeof(int));
       old[0][0] = index;
       old[0][1] = i;
     }
