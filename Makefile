@@ -1,7 +1,7 @@
 EXE=hamming_one
 
 $(EXE): main.cu data.cu data.cuh host.cu host.cuh device.cu device.cuh
-	nvcc -o $@ main.cu data.cu host.cu device.cu -std=c++17
+	nvcc -o $@ main.cu data.cu host.cu device.cu -std=c++17 -O3
 
 run: $(EXE)
 	./$(EXE)
