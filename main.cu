@@ -39,11 +39,10 @@ auto main() -> int {
   stop("Device alloc");
 
   start();
-  dim3 thread_dim(1024);
+  constexpr dim3 thread_dim(1024);
   d_hamming_one<<<
       Data::n_vectors / thread_dim.x + 1,
-      thread_dim.x,
-      thread_dim.x * Data::n_bits * sizeof(std::uint32_t)>>>(d_data.input, d_data.output, d_data.o_idx);
+      thread_dim.x>>>(d_data.input, d_data.output, d_data.o_idx);
   cudaDeviceSynchronize();
   stop("Device solution");
 
@@ -71,11 +70,10 @@ auto main() -> int {
         found = true;
         break;
       }
-
-      // show the flipped bit
-      std::cout << (h_vectors[h_res[j].first] ^ h_vectors[d_data.output[i][0]]) << std::endl;
     }
     assert(("A pair found on the device was not found on the host", found));
+    // show the flipped bit
+    std::cout << (h_vectors[d_data.output[i][0]] ^ h_vectors[d_data.output[i][1]]) << std::endl;
   }
   std::cout << "Host and device pairs match." << std::endl;
 

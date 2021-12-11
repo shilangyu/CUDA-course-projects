@@ -6,9 +6,9 @@
 #include <vector>
 
 struct DeviceData {
-  /// array of inputs, first dimension represents a vector,
-  /// second are individual bits in bundles of 32
-  std::uint32_t **input;
+  /// array of inputs, of length `Data::n_vectors * Data::n_32bits`
+  /// Stored as SoA: first bundle of 32 for each vector, then second, then third etc
+  std::uint32_t *input;
 
   /// array of pairs of indices of vectors with hamming distance of one
   /// first dimension are the pairs, second is a 2-element array
