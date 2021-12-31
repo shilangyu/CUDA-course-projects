@@ -19,9 +19,11 @@ public:
   /// amount of objects
   static constexpr std::size_t N = 100'000;
   /// amount of features (dimensionality)
-  static constexpr std::size_t n = 3;
+  static constexpr std::size_t n = 10;
   /// amount of clusters
   static constexpr std::size_t k = 30;
+
+  static_assert(N > 0 && n > 0 && k > 0 && N >= k);
 
   Data();
 

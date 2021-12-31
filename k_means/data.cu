@@ -10,9 +10,7 @@ Data::Data() {
   // fixed seed
   std::mt19937 gen(1);
   // uniform number generator for 32bit floating point numbers
-  std::uniform_real_distribution<> dist(
-      std::numeric_limits<float>::min(),
-      std::numeric_limits<float>::max());
+  std::uniform_real_distribution<float> dist(-100, 100);
 
   for (auto i = 0; i < N; i++) {
     std::array<float, n> object;
