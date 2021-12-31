@@ -49,7 +49,7 @@ __host__ auto h_k_means(const std::vector<std::array<float, Data::n>> &objects, 
     centroids[i] = objects[i];
   }
 
-  // keep of the amount of memberships that changed, to check for convergence
+  // keep the amount of memberships that changed to check for convergence
   std::size_t changed = Data::N;
 
   for (auto iter = 0; iter < max_iters && changed != 0; iter++) {

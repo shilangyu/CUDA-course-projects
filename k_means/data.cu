@@ -37,14 +37,19 @@ auto Data::to_device_data() const -> DeviceData {
     }
   }
 
-  float *output;
-  cudaMallocManaged(&output, k * n * sizeof(float));
-  cudaMemset(output, 0, k * n * sizeof(float));
+  float *centroids;
+  cudaMallocManaged(&centroids, k * n * sizeof(float));
+  // set as first `k` objects
+  for (auto i = 0; i < k; i++) {
+    for (auto j = 0; j < n; j++) {
+      centroids[j * k + i] = _data[i][j];
+    }
+  }
 
-  return {objects, output};
+  return {objects, centroids};
 }
 
 auto Data::delete_device_data(DeviceData data) -> void {
   cudaFree(data.objects);
-  cudaFree(data.output);
+  cudaFree(data.centroids);
 }

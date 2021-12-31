@@ -11,7 +11,8 @@ struct DeviceData {
   float *objects;
 
   /// array of centroids, length `Data::k * Data::n`
-  float *output;
+  /// stored as SoA, ie. [feature_num][cluster_num]
+  float *centroids;
 };
 
 class Data {
