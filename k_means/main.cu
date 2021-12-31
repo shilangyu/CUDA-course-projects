@@ -34,17 +34,13 @@ auto main() -> int {
   auto h_res = h_k_means(h_objects);
   stop("Host solution");
 
-  // start();
-  // auto d_data = data.to_device_data();
-  // stop("Device alloc");
+  start();
+  auto d_data = data.to_device_data();
+  stop("Device alloc");
 
-  // start();
-  // constexpr dim3 thread_dim(1024);
-  // d_hamming_one<<<
-  //     Data::n_vectors / thread_dim.x + 1,
-  //     thread_dim.x>>>(d_data.input, d_data.output, d_data.o_idx);
-  // cudaDeviceSynchronize();
-  // stop("Device solution");
+  start();
+  d_k_means(d_data);
+  stop("Device solution");
 
   // // count device results
   // std::size_t d_len;

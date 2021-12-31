@@ -2,5 +2,5 @@
 
 #include "data.cuh"
 
-/// given the vectors, finds pairs of vectors with hamming distance of one, stored in `output` (executed on GPU)
-__global__ auto d_k_means(const float *objects, float *centroids) -> void;
+/// given objects and allocated centroids space, fills the centroids with converged data
+auto d_k_means(DeviceData data, std::size_t max_iters = 1000) -> void;
