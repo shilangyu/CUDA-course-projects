@@ -4,7 +4,7 @@
 
 /// calculates distance between two objects
 /// currently implemented as the squared euclidean distance
-static inline auto distance(const float *obj1, const float *obj2) -> float {
+static inline auto distance(const std::array<float, Data::n> &obj1, const std::array<float, Data::n> &obj2) -> float {
   float res = 0;
   for (auto i = 0; i < Data::n; i++) {
     res += (obj1[i] - obj2[i]) * (obj1[i] - obj2[i]);
@@ -16,10 +16,10 @@ static inline auto distance(const float *obj1, const float *obj2) -> float {
 static inline auto nearest_centroid(
     const std::array<std::array<float, Data::n>, Data::k> &centroids,
     const std::array<float, Data::n> &object) -> std::size_t {
-  auto min_dist         = distance(object.data(), centroids[0].data());
+  auto min_dist         = distance(object, centroids[0]);
   std::size_t member_of = 0;
   for (auto j = 1; j < Data::k; j++) {
-    auto dist = distance(object.data(), centroids[j].data());
+    auto dist = distance(object, centroids[j]);
 
     if (dist < min_dist) {
       min_dist  = dist;
