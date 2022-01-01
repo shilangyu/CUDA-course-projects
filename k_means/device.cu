@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <tuple>
 
+template <std::size_t n>
 __device__ inline static auto distance(
     const float *objects,
     const float *centroids,
@@ -11,8 +12,8 @@ __device__ inline static auto distance(
     const std::size_t object_index,
     const std::size_t centroid_index) -> float {
   float res = 0;
-#pragma unroll(Data::n)
-  for (auto i = 0; i < Data::n; i++) {
+#pragma unroll(n)
+  for (auto i = 0; i < n; i++) {
     res += (objects[N * i + object_index] - centroids[k * i + centroid_index]) *
            (objects[N * i + object_index] - centroids[k * i + centroid_index]);
   }
@@ -20,16 +21,17 @@ __device__ inline static auto distance(
 }
 
 /// returns index to the nearest centroid
+template <std::size_t n>
 __device__ static inline auto nearest_centroid(
     const float *objects,
     const float *centroids,
     const std::size_t N,
     const std::size_t k,
     const std::size_t object_index) -> std::size_t {
-  auto min_dist         = distance(objects, centroids, N, k, object_index, 0);
+  auto min_dist         = distance<n>(objects, centroids, N, k, object_index, 0);
   std::size_t member_of = 0;
   for (auto j = 1; j < k; j++) {
-    auto dist = distance(objects, centroids, N, k, object_index, j);
+    auto dist = distance<n>(objects, centroids, N, k, object_index, j);
 
     if (dist < min_dist) {
       min_dist  = dist;
@@ -40,6 +42,7 @@ __device__ static inline auto nearest_centroid(
   return member_of;
 }
 
+template <std::size_t n>
 __global__ auto get_memberships(
     const float *objects,
     const float *centroids,
@@ -56,7 +59,7 @@ __global__ auto get_memberships(
   changed[local] = 0;
 
   if (index < N) {
-    auto member_of = nearest_centroid(objects, centroids, N, k, index);
+    auto member_of = nearest_centroid<n>(objects, centroids, N, k, index);
 
     changed[local]     = member_of != memberships[index];
     memberships[index] = member_of;
@@ -66,9 +69,10 @@ __global__ auto get_memberships(
   }
 }
 
+template <std::size_t n>
 auto d_k_means(DeviceData data, const std::size_t N, const std::size_t k, std::size_t max_iters) -> void {
   // intermediate centroids data, stores sum of features and amount of members (mean accumulator)
-  std::vector<std::tuple<std::array<float, Data::n>, std::size_t>> inter(k);
+  std::vector<std::tuple<std::array<float, n>, std::size_t>> inter(k);
 
   // array of indexes to centroids an object belongs to
   std::size_t *memberships;
@@ -91,7 +95,7 @@ auto d_k_means(DeviceData data, const std::size_t N, const std::size_t k, std::s
 
     dim3 thread_dim(1024);
 
-    get_memberships<<<
+    get_memberships<n><<<
         N / thread_dim.x + 1,
         thread_dim,
         thread_dim.x * sizeof(std::uint8_t)>>>(data.objects, data.centroids, N, k, memberships, changed);
@@ -101,7 +105,7 @@ auto d_k_means(DeviceData data, const std::size_t N, const std::size_t k, std::s
     for (auto i = 0; i < N; i++) {
       // update mean accumulator
       auto &[sum, count] = inter[memberships[i]];
-      for (auto j = 0; j < Data::n; j++) {
+      for (auto j = 0; j < n; j++) {
         sum[j] += data.objects[j * N + i];
       }
       count += 1;
@@ -112,7 +116,7 @@ auto d_k_means(DeviceData data, const std::size_t N, const std::size_t k, std::s
       auto &[sum, count] = inter[i];
 
       if (count != 0) {
-        for (auto j = 0; j < Data::n; j++) {
+        for (auto j = 0; j < n; j++) {
           data.centroids[j * k + i] = sum[j] / count;
         }
       }

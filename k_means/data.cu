@@ -6,7 +6,8 @@
 #include <random>
 #include <utility>
 
-Data::Data(const std::size_t N, const std::size_t k) : N(N), k(k) {
+template <std::size_t n>
+Data<n>::Data(const std::size_t N, const std::size_t k) : N(N), k(k) {
   assert(N > 0 && k > 0 && N >= k);
 
   _data = std::vector<std::array<float, n>>(N);
@@ -26,11 +27,13 @@ Data::Data(const std::size_t N, const std::size_t k) : N(N), k(k) {
   }
 }
 
-auto Data::to_host_data() const -> std::vector<std::array<float, n>> {
+template <std::size_t n>
+auto Data<n>::to_host_data() const -> std::vector<std::array<float, n>> {
   return _data;
 }
 
-auto Data::to_device_data() const -> DeviceData {
+template <std::size_t n>
+auto Data<n>::to_device_data() const -> DeviceData {
   float *objects;
 
   cudaMallocManaged(&objects, N * n * sizeof(float));
@@ -52,7 +55,8 @@ auto Data::to_device_data() const -> DeviceData {
   return {objects, centroids};
 }
 
-auto Data::delete_device_data(DeviceData data) -> void {
+template <std::size_t n>
+auto Data<n>::delete_device_data(DeviceData data) -> void {
   cudaFree(data.objects);
   cudaFree(data.centroids);
 }

@@ -4,18 +4,20 @@
 
 /// calculates distance between two objects
 /// currently implemented as the squared euclidean distance
-static inline auto distance(const std::array<float, Data::n> &obj1, const std::array<float, Data::n> &obj2) -> float {
+template <std::size_t n>
+static inline auto distance(const std::array<float, n> &obj1, const std::array<float, n> &obj2) -> float {
   float res = 0;
-  for (auto i = 0; i < Data::n; i++) {
+  for (auto i = 0; i < n; i++) {
     res += (obj1[i] - obj2[i]) * (obj1[i] - obj2[i]);
   }
   return res;
 }
 
 /// returns index to the centroid
+template <std::size_t n>
 static inline auto nearest_centroid(
-    const std::vector<std::array<float, Data::n>> &centroids,
-    const std::array<float, Data::n> &object) -> std::size_t {
+    const std::vector<std::array<float, n>> &centroids,
+    const std::array<float, n> &object) -> std::size_t {
   auto min_dist         = distance(object, centroids[0]);
   std::size_t member_of = 0;
   for (auto j = 1; j < centroids.size(); j++) {
@@ -30,12 +32,13 @@ static inline auto nearest_centroid(
   return member_of;
 }
 
-__host__ auto h_k_means(const std::vector<std::array<float, Data::n>> &objects, const std::size_t k, const std::size_t max_iters)
-    -> std::vector<std::array<float, Data::n>> {
-  std::vector<std::array<float, Data::n>> centroids(k);
+template <std::size_t n>
+__host__ auto h_k_means(const std::vector<std::array<float, n>> &objects, const std::size_t k, const std::size_t max_iters)
+    -> std::vector<std::array<float, n>> {
+  std::vector<std::array<float, n>> centroids(k);
 
   // intermediate centroids data, stores sum of features and amount of members (mean accumulator)
-  std::vector<std::tuple<std::array<float, Data::n>, std::size_t>> inter(k);
+  std::vector<std::tuple<std::array<float, n>, std::size_t>> inter(k);
   // index of the centroid it belongs to
   std::vector<std::size_t> memberships(objects.size(), 0);
 
@@ -63,7 +66,7 @@ __host__ auto h_k_means(const std::vector<std::array<float, Data::n>> &objects, 
 
       // update mean accumulator
       auto &[sum, count] = inter[memberships[i]];
-      for (auto j = 0; j < Data::n; j++) {
+      for (auto j = 0; j < n; j++) {
         sum[j] += objects[i][j];
       }
       count += 1;
@@ -76,7 +79,7 @@ __host__ auto h_k_means(const std::vector<std::array<float, Data::n>> &objects, 
       auto &[sum, count] = inter[i];
 
       if (count != 0) {
-        for (auto j = 0; j < Data::n; j++) {
+        for (auto j = 0; j < n; j++) {
           centroids[i][j] = sum[j] / count;
         }
       }

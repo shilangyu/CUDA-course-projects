@@ -24,7 +24,7 @@ auto main() -> int {
               << std::endl;
   };
 
-  Data data(100'000, 30);
+  Data<10> data(100'000, 30);
 
   start();
   auto h_objects = data.to_host_data();
@@ -39,7 +39,7 @@ auto main() -> int {
   stop("Device alloc");
 
   start();
-  d_k_means(d_data, data.N, data.k);
+  d_k_means<data.get_n()>(d_data, data.N, data.k);
   stop("Device solution");
 
   // // count device results
