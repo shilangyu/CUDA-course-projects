@@ -12,7 +12,7 @@ __device__ inline static auto distance(
     const std::size_t object_index,
     const std::size_t centroid_index) -> float {
   float res = 0;
-#pragma unroll(n)
+#pragma unroll
   for (auto i = 0; i < n; i++) {
     res += (objects[N * i + object_index] - centroids[k * i + centroid_index]) *
            (objects[N * i + object_index] - centroids[k * i + centroid_index]);
@@ -127,12 +127,14 @@ auto d_k_means(DeviceData data, const std::size_t N, const std::size_t k, std::s
   for (auto iter = 0; iter < max_iters && *changed != 0; iter++) {
     *changed = 0;
 
-    constexpr dim3 thread_dim(1024);
+    constexpr std::size_t block_size = 1024;
 
-    get_memberships<n, thread_dim.x><<<
-        N / thread_dim.x + 1,
-        thread_dim>>>(data.objects, data.centroids, N, k, memberships, changed);
+    get_memberships<n, block_size><<<
+        N / block_size + 1,
+        block_size>>>(data.objects, data.centroids, N, k, memberships, changed);
     cudaDeviceSynchronize();
+
+    std::cout << "changed=" << *changed << std::endl;
 
     // TODO: move the next bit of code to CUDA
     for (auto i = 0; i < N; i++) {
