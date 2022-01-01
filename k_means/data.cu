@@ -1,11 +1,14 @@
 #include "data.cuh"
+#include <cassert>
 #include <cstdint>
 #include <iostream>
 #include <limits>
 #include <random>
 #include <utility>
 
-Data::Data() {
+Data::Data(const std::size_t N, const std::size_t k) : N(N), k(k) {
+  assert(N > 0 && k > 0 && N >= k);
+
   _data = std::vector<std::array<float, n>>(N);
   // fixed seed
   std::mt19937 gen(1);

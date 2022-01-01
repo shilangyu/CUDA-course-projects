@@ -14,11 +14,11 @@ static inline auto distance(const std::array<float, Data::n> &obj1, const std::a
 
 /// returns index to the centroid
 static inline auto nearest_centroid(
-    const std::array<std::array<float, Data::n>, Data::k> &centroids,
+    const std::vector<std::array<float, Data::n>> &centroids,
     const std::array<float, Data::n> &object) -> std::size_t {
   auto min_dist         = distance(object, centroids[0]);
   std::size_t member_of = 0;
-  for (auto j = 1; j < Data::k; j++) {
+  for (auto j = 1; j < centroids.size(); j++) {
     auto dist = distance(object, centroids[j]);
 
     if (dist < min_dist) {
@@ -30,14 +30,14 @@ static inline auto nearest_centroid(
   return member_of;
 }
 
-__host__ auto h_k_means(const std::vector<std::array<float, Data::n>> &objects, std::size_t max_iters)
-    -> std::array<std::array<float, Data::n>, Data::k> {
-  std::array<std::array<float, Data::n>, Data::k> centroids;
+__host__ auto h_k_means(const std::vector<std::array<float, Data::n>> &objects, const std::size_t k, const std::size_t max_iters)
+    -> std::vector<std::array<float, Data::n>> {
+  std::vector<std::array<float, Data::n>> centroids(k);
 
   // intermediate centroids data, stores sum of features and amount of members (mean accumulator)
-  std::array<std::tuple<std::array<float, Data::n>, std::size_t>, Data::k> inter;
+  std::vector<std::tuple<std::array<float, Data::n>, std::size_t>> inter(k);
   // index of the centroid it belongs to
-  std::vector<std::size_t> memberships(Data::N, 0);
+  std::vector<std::size_t> memberships(objects.size(), 0);
 
   // initial `inter` setup
   for (auto &[sum, count] : inter) {
@@ -45,17 +45,17 @@ __host__ auto h_k_means(const std::vector<std::array<float, Data::n>> &objects, 
     count = 0;
   }
   // set centroids to first `k` objects
-  for (auto i = 0; i < Data::k; i++) {
+  for (auto i = 0; i < k; i++) {
     centroids[i] = objects[i];
   }
 
   // keep the amount of memberships that changed to check for convergence
-  std::size_t changed = Data::N;
+  std::size_t changed = objects.size();
 
   for (auto iter = 0; iter < max_iters && changed != 0; iter++) {
     changed = 0;
 
-    for (auto i = 0; i < Data::N; i++) {
+    for (auto i = 0; i < objects.size(); i++) {
       auto member_of = nearest_centroid(centroids, objects[i]);
 
       if (member_of != memberships[i]) changed += 1;
@@ -72,7 +72,7 @@ __host__ auto h_k_means(const std::vector<std::array<float, Data::n>> &objects, 
     std::cout << "changed=" << changed << std::endl;
 
     // set new centroids
-    for (auto i = 0; i < Data::k; i++) {
+    for (auto i = 0; i < k; i++) {
       auto &[sum, count] = inter[i];
 
       if (count != 0) {

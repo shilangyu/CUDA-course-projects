@@ -18,15 +18,15 @@ struct DeviceData {
 class Data {
 public:
   /// amount of objects
-  static constexpr std::size_t N = 100'000;
+  const std::size_t N;
   /// amount of features (dimensionality)
   static constexpr std::size_t n = 10;
   /// amount of clusters
-  static constexpr std::size_t k = 30;
+  const std::size_t k;
 
-  static_assert(N > 0 && n > 0 && k > 0 && N >= k);
+  static_assert(n > 0);
 
-  Data();
+  Data(const std::size_t N, const std::size_t k);
 
   /// vector of arrays of features
   auto to_host_data() const -> std::vector<std::array<float, n>>;
