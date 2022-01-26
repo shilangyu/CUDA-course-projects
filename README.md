@@ -15,6 +15,6 @@ Some run results can be found in [hamming_one/results](./hamming_one/results). O
 
 ## K-means
 
-Given `N` points in a `n` dimensional space, find `K` centroids which will cluster the data.
+Given `N` points in a `n` dimensional space, find `k` centroids which will cluster the data.
 
 TODO
