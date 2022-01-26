@@ -98,15 +98,102 @@ __global__ auto get_memberships(
   }
 
   if (local == 0) {
-    // TODO: consider performing further reduction instead of an atomic add
+    atomicAdd(changed_counter, changed[0]);
+  }
+}
+
+/// atomics (naive)
+/// Each thread adds its object's features
+template <std::size_t n, std::size_t block_size>
+__global__ auto d_k_means2_all(
+    const float *objects,
+    float *centroids,
+    const std::size_t N,
+    const std::size_t k,
+    std::size_t *memberships,
+    float *inter,
+    int *changed_counter) -> void {
+  static_assert((block_size & (block_size - 1)) == 0, "block_size has to be a power of two");
+
+  // array of 0/1 flags saying whether a membership has changed. It is later reduced to a sum (to avoid atomic adds)
+  __shared__ std::uint8_t changed[block_size];
+
+  const auto index = blockIdx.x * block_size + threadIdx.x;
+  const auto local = threadIdx.x;
+
+  changed[local] = 0;
+
+  if (index < N) {
+    auto member_of = nearest_centroid<n>(objects, centroids, N, k, index);
+
+    changed[local]     = member_of != memberships[index];
+    memberships[index] = member_of;
+
+    // sum up features
+    if (index < N) {
+      auto c = memberships[index];
+
+      for (auto i = 0; i < N; i++) {
+        // update mean accumulator
+        auto &[sum, count] = inter[memberships[i]];
+        for (auto j = 0; j < n; j++) {
+          sum[j] += data.objects[j * N + i];
+        }
+        count += 1;
+      }
+
+      // atomicAdd(inter + ())
+
+#pragma unroll(n)
+      for (auto i = 0; i < n; i++) {
+        // TODO: consider reading all objects before losing sync by atomic adds
+        atomicAdd(centroids + (i * k + c), objects[i * N + index]);
+      }
+    }
+  }
+  __syncthreads();
+
+  // reduce `changed` to a sum
+  if constexpr (block_size >= 1024) {
+    if (local < 512) changed[local] += changed[local + 512];
+    __syncthreads();
+  }
+  if constexpr (block_size >= 512) {
+    if (local < 256) changed[local] += changed[local + 256];
+    __syncthreads();
+  }
+  if constexpr (block_size >= 256) {
+    if (local < 128) changed[local] += changed[local + 128];
+    __syncthreads();
+  }
+  if constexpr (block_size >= 128) {
+    if (local < 64) changed[local] += changed[local + 64];
+    __syncthreads();
+  }
+  // no need for __syncthreads since we are in a single warp
+  if (local < 32) {
+    if constexpr (block_size >= 64) changed[local] += changed[local + 32];
+    if constexpr (block_size >= 32) changed[local] += changed[local + 16];
+    if constexpr (block_size >= 16) changed[local] += changed[local + 8];
+    if constexpr (block_size >= 8) changed[local] += changed[local + 4];
+    if constexpr (block_size >= 4) changed[local] += changed[local + 2];
+    if constexpr (block_size >= 2) changed[local] += changed[local + 1];
+  }
+
+  if (local == 0) {
     atomicAdd(changed_counter, changed[0]);
   }
 }
 
 template <std::size_t n>
-auto d_k_means(DeviceData data, const std::size_t N, const std::size_t k, std::size_t max_iters) -> void {
+auto d_k_means1(DeviceData data, const std::size_t N, const std::size_t k, std::size_t max_iters) -> void {
   // intermediate centroids data, stores sum of features and amount of members (mean accumulator)
   std::vector<std::tuple<std::array<float, n>, std::size_t>> inter(k);
+  // initial `inter` setup
+  for (auto &[sum, count] : inter) {
+    sum.fill(0);
+    count = 0;
+  }
 
   // array of indexes to centroids an object belongs to
   std::size_t *memberships;
@@ -118,12 +205,6 @@ auto d_k_means(DeviceData data, const std::size_t N, const std::size_t k, std::s
   cudaMallocManaged(&changed, sizeof(std::size_t));
   *changed = N;
 
-  // initial `inter` setup
-  for (auto &[sum, count] : inter) {
-    sum.fill(0);
-    count = 0;
-  }
-
   for (auto iter = 0; iter < max_iters && *changed != 0; iter++) {
     *changed = 0;
 
@@ -134,9 +215,6 @@ auto d_k_means(DeviceData data, const std::size_t N, const std::size_t k, std::s
         block_size>>>(data.objects, data.centroids, N, k, memberships, changed);
     cudaDeviceSynchronize();
 
-    std::cout << "changed=" << *changed << std::endl;
-
-    // TODO: move the next bit of code to CUDA
     for (auto i = 0; i < N; i++) {
       // update mean accumulator
       auto &[sum, count] = inter[memberships[i]];
@@ -159,8 +237,46 @@ auto d_k_means(DeviceData data, const std::size_t N, const std::size_t k, std::s
       sum.fill(0);
       count = 0;
     }
+
+    std::cout << "changed=" << *changed << std::endl;
   }
 
   cudaFree(memberships);
   cudaFree(changed);
+}
+
+template <std::size_t n>
+auto d_k_means2(DeviceData data, const std::size_t N, const std::size_t k, std::size_t max_iters) -> void {
+  // intermediate centroids data, stores sum of features and amount of members (mean accumulator)
+  float *inter;
+  // (n + 1) to store an additional counter
+  cudaMallocManaged(&inter, (n + 1) * k * sizeof(float));
+
+  // array of indexes to centroids an object belongs to
+  std::size_t *memberships;
+  cudaMallocManaged(&memberships, N * sizeof(std::size_t));
+  cudaMemset(memberships, 0, N * sizeof(std::size_t));
+
+  // single global counter of the amount of memberships that have changed in an iteration
+  int *changed;
+  cudaMallocManaged(&changed, sizeof(std::size_t));
+  *changed = N;
+
+  for (auto iter = 0; iter < max_iters && *changed != 0; iter++) {
+    *changed = 0;
+    cudaMemset(inter, 0, (n + 1) * k * sizeof(float));
+
+    constexpr std::size_t block_size = 1024;
+
+    d_k_means2_all<n, block_size><<<
+        N / block_size + 1,
+        block_size>>>(data.objects, data.centroids, N, k, memberships, inter, changed);
+    cudaDeviceSynchronize();
+
+    std::cout << "changed=" << *changed << std::endl;
+  }
+
+  cudaFree(memberships);
+  cudaFree(changed);
+  cudaFree(inter);
 }

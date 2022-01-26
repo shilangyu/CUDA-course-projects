@@ -72,7 +72,7 @@ __host__ auto h_k_means(const std::vector<std::array<float, n>> &objects, const 
       count += 1;
     }
 
-    std::cout << "changed=" << changed << std::endl;
+    // std::cout << "changed=" << changed << std::endl;
 
     // set new centroids
     for (auto i = 0; i < k; i++) {

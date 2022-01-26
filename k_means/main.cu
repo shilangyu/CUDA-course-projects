@@ -23,15 +23,15 @@ auto test(const std::size_t N, const std::size_t k) -> void {
   auto h_t       = duration_cast<microseconds>(_stop - _start).count();
 
   // parallel GPU solution
-  auto d_data = data.to_device_data();
-  _start      = high_resolution_clock::now();
-  d_k_means<n>(d_data, data.N, data.k);
-  _stop    = high_resolution_clock::now();
+  // auto d_data = data.to_device_data();
+  // _start      = high_resolution_clock::now();
+  // d_k_means<n>(d_data, data.N, data.k);
+  // _stop    = high_resolution_clock::now();
   auto d_t = duration_cast<microseconds>(_stop - _start).count();
 
   std::cout << n << "," << k << "," << N << "," << h_t << "," << d_t << std::endl;
 
-  Data<n>::delete_device_data(d_data);
+  // Data<n>::delete_device_data(d_data);
 }
 
 auto main() -> int {
