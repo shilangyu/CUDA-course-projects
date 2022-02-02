@@ -33,8 +33,8 @@ static inline auto nearest_centroid(
 }
 
 template <std::size_t n>
-__host__ auto h_k_means(const std::vector<std::array<float, n>> &objects, const std::size_t k, const std::size_t max_iters)
-    -> std::vector<std::array<float, n>> {
+__host__ auto h_k_means(const std::vector<std::array<float, n>> &objects, const std::size_t k, const std::size_t max_iters, const float convergence_delta)
+    -> std::tuple<std::vector<std::array<float, n>>, std::size_t> {
   std::vector<std::array<float, n>> centroids(k);
 
   // intermediate centroids data, stores sum of features and amount of members (mean accumulator)
@@ -54,14 +54,15 @@ __host__ auto h_k_means(const std::vector<std::array<float, n>> &objects, const 
 
   // keep the amount of memberships that changed to check for convergence
   std::size_t changed = objects.size();
+  std::size_t iter;
 
-  for (auto iter = 0; iter < max_iters && changed != 0; iter++) {
+  for (iter = 0; iter < max_iters && changed / objects.size() > convergence_delta; iter++) {
     changed = 0;
 
     for (auto i = 0; i < objects.size(); i++) {
       auto member_of = nearest_centroid(centroids, objects[i]);
 
-      if (member_of != memberships[i]) changed += 1;
+      changed += (member_of != memberships[i]);
       memberships[i] = member_of;
 
       // update mean accumulator
@@ -71,8 +72,6 @@ __host__ auto h_k_means(const std::vector<std::array<float, n>> &objects, const 
       }
       count += 1;
     }
-
-    // std::cout << "changed=" << changed << std::endl;
 
     // set new centroids
     for (auto i = 0; i < k; i++) {
@@ -89,5 +88,5 @@ __host__ auto h_k_means(const std::vector<std::array<float, n>> &objects, const 
     }
   }
 
-  return centroids;
+  return {centroids, iter};
 }

@@ -42,6 +42,16 @@ __device__ static inline auto nearest_centroid(
   return member_of;
 }
 
+template <std::size_t block_size>
+__device__ auto warp_reduce(volatile std::uint8_t *changed, std::size_t local) -> void {
+  if constexpr (block_size >= 64) changed[local] += changed[local + 32];
+  if constexpr (block_size >= 32) changed[local] += changed[local + 16];
+  if constexpr (block_size >= 16) changed[local] += changed[local + 8];
+  if constexpr (block_size >= 8) changed[local] += changed[local + 4];
+  if constexpr (block_size >= 4) changed[local] += changed[local + 2];
+  if constexpr (block_size >= 2) changed[local] += changed[local + 1];
+}
+
 /// Stores in `memberships` indexes of the centroid an object is closest to
 /// Additionally stores in `changed_counter` the amount of changed memberships (thus given `memberships` should contain previous memberships)
 template <std::size_t n, std::size_t block_size>
@@ -89,12 +99,7 @@ __global__ auto get_memberships(
   }
   // no need for __syncthreads since we are in a single warp
   if (local < 32) {
-    if constexpr (block_size >= 64) changed[local] += changed[local + 32];
-    if constexpr (block_size >= 32) changed[local] += changed[local + 16];
-    if constexpr (block_size >= 16) changed[local] += changed[local + 8];
-    if constexpr (block_size >= 8) changed[local] += changed[local + 4];
-    if constexpr (block_size >= 4) changed[local] += changed[local + 2];
-    if constexpr (block_size >= 2) changed[local] += changed[local + 1];
+    warp_reduce<block_size>(changed, local);
   }
 
   if (local == 0) {
@@ -130,26 +135,26 @@ __global__ auto d_k_means2_all(
     memberships[index] = member_of;
 
     // sum up features
-    if (index < N) {
-      auto c = memberships[index];
+    //     if (index < N) {
+    //       auto c = memberships[index];
 
-      for (auto i = 0; i < N; i++) {
-        // update mean accumulator
-        auto &[sum, count] = inter[memberships[i]];
-        for (auto j = 0; j < n; j++) {
-          sum[j] += data.objects[j * N + i];
-        }
-        count += 1;
-      }
+    //       for (auto i = 0; i < N; i++) {
+    //         // update mean accumulator
+    //         auto &[sum, count] = inter[memberships[i]];
+    //         for (auto j = 0; j < n; j++) {
+    //           sum[j] += data.objects[j * N + i];
+    //         }
+    //         count += 1;
+    //       }
 
-      // atomicAdd(inter + ())
+    //       // atomicAdd(inter + ())
 
-#pragma unroll(n)
-      for (auto i = 0; i < n; i++) {
-        // TODO: consider reading all objects before losing sync by atomic adds
-        atomicAdd(centroids + (i * k + c), objects[i * N + index]);
-      }
-    }
+    // #pragma unroll(n)
+    //       for (auto i = 0; i < n; i++) {
+    //         // TODO: consider reading all objects before losing sync by atomic adds
+    //         atomicAdd(centroids + (i * k + c), objects[i * N + index]);
+    //       }
+    //     }
   }
   __syncthreads();
 
@@ -172,12 +177,7 @@ __global__ auto d_k_means2_all(
   }
   // no need for __syncthreads since we are in a single warp
   if (local < 32) {
-    if constexpr (block_size >= 64) changed[local] += changed[local + 32];
-    if constexpr (block_size >= 32) changed[local] += changed[local + 16];
-    if constexpr (block_size >= 16) changed[local] += changed[local + 8];
-    if constexpr (block_size >= 8) changed[local] += changed[local + 4];
-    if constexpr (block_size >= 4) changed[local] += changed[local + 2];
-    if constexpr (block_size >= 2) changed[local] += changed[local + 1];
+    warp_reduce<block_size>(changed, local);
   }
 
   if (local == 0) {
@@ -186,7 +186,7 @@ __global__ auto d_k_means2_all(
 }
 
 template <std::size_t n>
-auto d_k_means1(DeviceData data, const std::size_t N, const std::size_t k, std::size_t max_iters) -> void {
+auto d_k_means1(DeviceData data, const std::size_t N, const std::size_t k, const std::size_t max_iters, const float convergence_delta) -> std::size_t {
   // intermediate centroids data, stores sum of features and amount of members (mean accumulator)
   std::vector<std::tuple<std::array<float, n>, std::size_t>> inter(k);
   // initial `inter` setup
@@ -204,8 +204,9 @@ auto d_k_means1(DeviceData data, const std::size_t N, const std::size_t k, std::
   int *changed;
   cudaMallocManaged(&changed, sizeof(std::size_t));
   *changed = N;
+  std::size_t iter;
 
-  for (auto iter = 0; iter < max_iters && *changed != 0; iter++) {
+  for (iter = 0; iter < max_iters && (*changed) / N > convergence_delta; iter++) {
     *changed = 0;
 
     constexpr std::size_t block_size = 1024;
@@ -237,16 +238,16 @@ auto d_k_means1(DeviceData data, const std::size_t N, const std::size_t k, std::
       sum.fill(0);
       count = 0;
     }
-
-    std::cout << "changed=" << *changed << std::endl;
   }
 
   cudaFree(memberships);
   cudaFree(changed);
+
+  return iter;
 }
 
 template <std::size_t n>
-auto d_k_means2(DeviceData data, const std::size_t N, const std::size_t k, std::size_t max_iters) -> void {
+auto d_k_means2(DeviceData data, const std::size_t N, const std::size_t k, const std::size_t max_iters, const float convergence_delta) -> std::size_t {
   // intermediate centroids data, stores sum of features and amount of members (mean accumulator)
   float *inter;
   // (n + 1) to store an additional counter
@@ -261,8 +262,9 @@ auto d_k_means2(DeviceData data, const std::size_t N, const std::size_t k, std::
   int *changed;
   cudaMallocManaged(&changed, sizeof(std::size_t));
   *changed = N;
+  std::size_t iter;
 
-  for (auto iter = 0; iter < max_iters && *changed != 0; iter++) {
+  for (iter = 0; iter < max_iters && (*changed) / N > convergence_delta; iter++) {
     *changed = 0;
     cudaMemset(inter, 0, (n + 1) * k * sizeof(float));
 
@@ -272,11 +274,11 @@ auto d_k_means2(DeviceData data, const std::size_t N, const std::size_t k, std::
         N / block_size + 1,
         block_size>>>(data.objects, data.centroids, N, k, memberships, inter, changed);
     cudaDeviceSynchronize();
-
-    std::cout << "changed=" << *changed << std::endl;
   }
 
   cudaFree(memberships);
   cudaFree(changed);
   cudaFree(inter);
+
+  return iter;
 }
