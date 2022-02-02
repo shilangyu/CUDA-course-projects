@@ -56,7 +56,9 @@ __host__ auto h_k_means(const std::vector<std::array<float, n>> &objects, const 
   std::size_t changed = objects.size();
   std::size_t iter;
 
-  for (iter = 0; iter < max_iters && changed / objects.size() > convergence_delta; iter++) {
+  std::size_t threshold = static_cast<std::size_t>(convergence_delta * objects.size());
+
+  for (iter = 0; iter < max_iters && changed > threshold; iter++) {
     changed = 0;
 
     for (auto i = 0; i < objects.size(); i++) {

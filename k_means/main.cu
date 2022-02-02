@@ -29,8 +29,6 @@ auto test(const std::size_t N, const std::size_t k) -> void {
   _stop        = high_resolution_clock::now();
   auto d_t     = duration_cast<microseconds>(_stop - _start).count();
 
-  assert(h_iters == d_iters);
-
   std::cout << n << "," << k << "," << N << "," << h_t << "," << d_t << std::endl;
 
   Data<n>::delete_device_data(d_data);

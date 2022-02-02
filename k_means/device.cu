@@ -12,7 +12,8 @@ __device__ inline static auto distance(
     const std::size_t object_index,
     const std::size_t centroid_index) -> float {
   float res = 0;
-#pragma unroll
+// disable unrolling, we run out of registers on larger `n`
+#pragma unroll 1
   for (auto i = 0; i < n; i++) {
     res += (objects[N * i + object_index] - centroids[k * i + centroid_index]) *
            (objects[N * i + object_index] - centroids[k * i + centroid_index]);
@@ -117,6 +118,7 @@ __global__ auto d_k_means2_all(
     const std::size_t k,
     std::size_t *memberships,
     float *inter,
+    int *counters,
     int *changed_counter) -> void {
   static_assert((block_size & (block_size - 1)) == 0, "block_size has to be a power of two");
 
@@ -135,26 +137,14 @@ __global__ auto d_k_means2_all(
     memberships[index] = member_of;
 
     // sum up features
-    //     if (index < N) {
-    //       auto c = memberships[index];
+    if (index < N) {
+      atomicAdd(counters + member_of, 1);
 
-    //       for (auto i = 0; i < N; i++) {
-    //         // update mean accumulator
-    //         auto &[sum, count] = inter[memberships[i]];
-    //         for (auto j = 0; j < n; j++) {
-    //           sum[j] += data.objects[j * N + i];
-    //         }
-    //         count += 1;
-    //       }
-
-    //       // atomicAdd(inter + ())
-
-    // #pragma unroll(n)
-    //       for (auto i = 0; i < n; i++) {
-    //         // TODO: consider reading all objects before losing sync by atomic adds
-    //         atomicAdd(centroids + (i * k + c), objects[i * N + index]);
-    //       }
-    //     }
+#pragma unroll(n)
+      for (auto i = 0; i < n; i++) {
+        atomicAdd(inter + (i * k + member_of), objects[i * N + index]);
+      }
+    }
   }
   __syncthreads();
 
@@ -205,12 +195,12 @@ auto d_k_means1(DeviceData data, const std::size_t N, const std::size_t k, const
   cudaMallocManaged(&changed, sizeof(std::size_t));
   *changed = N;
   std::size_t iter;
+  std::size_t threshold = static_cast<std::size_t>(convergence_delta * N);
 
-  for (iter = 0; iter < max_iters && (*changed) / N > convergence_delta; iter++) {
+  for (iter = 0; iter < max_iters && ((*changed) > threshold); iter++) {
     *changed = 0;
 
     constexpr std::size_t block_size = 1024;
-
     get_memberships<n, block_size><<<
         N / block_size + 1,
         block_size>>>(data.objects, data.centroids, N, k, memberships, changed);
@@ -248,10 +238,12 @@ auto d_k_means1(DeviceData data, const std::size_t N, const std::size_t k, const
 
 template <std::size_t n>
 auto d_k_means2(DeviceData data, const std::size_t N, const std::size_t k, const std::size_t max_iters, const float convergence_delta) -> std::size_t {
-  // intermediate centroids data, stores sum of features and amount of members (mean accumulator)
+  // intermediate centroids data, stores sum of features
   float *inter;
-  // (n + 1) to store an additional counter
-  cudaMallocManaged(&inter, (n + 1) * k * sizeof(float));
+  // and amount of members (mean accumulator)
+  int *counters;
+  cudaMallocManaged(&inter, n * k * sizeof(float));
+  cudaMallocManaged(&counters, k * sizeof(int));
 
   // array of indexes to centroids an object belongs to
   std::size_t *memberships;
@@ -263,22 +255,31 @@ auto d_k_means2(DeviceData data, const std::size_t N, const std::size_t k, const
   cudaMallocManaged(&changed, sizeof(std::size_t));
   *changed = N;
   std::size_t iter;
+  std::size_t threshold = static_cast<std::size_t>(convergence_delta * N);
 
-  for (iter = 0; iter < max_iters && (*changed) / N > convergence_delta; iter++) {
+  for (iter = 0; iter < max_iters && (*changed) > threshold; iter++) {
     *changed = 0;
-    cudaMemset(inter, 0, (n + 1) * k * sizeof(float));
+    cudaMemset(inter, 0, n * k * sizeof(float));
+    cudaMemset(counters, 0, k * sizeof(int));
 
     constexpr std::size_t block_size = 1024;
 
     d_k_means2_all<n, block_size><<<
         N / block_size + 1,
-        block_size>>>(data.objects, data.centroids, N, k, memberships, inter, changed);
+        block_size>>>(data.objects, data.centroids, N, k, memberships, inter, counters, changed);
     cudaDeviceSynchronize();
+
+    for (auto i = 0; i < k; i++) {
+      for (auto j = 0; j < n; j++) {
+        data.centroids[k * j + i] = inter[j * k + i] / counters[i];
+      }
+    }
   }
 
   cudaFree(memberships);
   cudaFree(changed);
   cudaFree(inter);
+  cudaFree(counters);
 
   return iter;
 }
